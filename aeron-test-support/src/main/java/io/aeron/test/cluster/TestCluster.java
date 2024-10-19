@@ -67,6 +67,7 @@ import org.agrona.BitUtil;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
+import org.agrona.SemanticVersion;
 import org.agrona.collections.ArrayUtil;
 import org.agrona.collections.IntHashSet;
 import org.agrona.collections.MutableBoolean;
@@ -159,6 +160,7 @@ public final class TestCluster implements AutoCloseable
     private File markFileBaseDir;
     private String clusterBaseDir;
     private ClusterBackup.Configuration.ReplayStart replayStart;
+    private int consensusModuleAppVersion = SemanticVersion.compose(0, 0, 1);
 
     private TestCluster(
         final int staticMemberCount,
@@ -327,7 +329,8 @@ public final class TestCluster implements AutoCloseable
             .timerServiceSupplier(timerServiceSupplier)
             .acceptStandbySnapshots(acceptStandbySnapshots)
             .markFileDir(markFileDir)
-            .deleteDirOnStart(cleanStart);
+            .deleteDirOnStart(cleanStart)
+            .appVersion(consensusModuleAppVersion);
 
         nodes[index] = new TestNode(context, dataCollector);
 
@@ -489,7 +492,8 @@ public final class TestCluster implements AutoCloseable
             .timerServiceSupplier(timerServiceSupplier)
             .acceptStandbySnapshots(acceptStandbySnapshots)
             .markFileDir(markFileDir)
-            .deleteDirOnStart(false);
+            .deleteDirOnStart(false)
+            .appVersion(consensusModuleAppVersion);
 
         backupNode = null;
         nodes[backupNodeIndex] = new TestNode(context, dataCollector);
@@ -2057,6 +2061,7 @@ public final class TestCluster implements AutoCloseable
         private String clusterBaseDir = System.getProperty(
             CLUSTER_BASE_DIR_PROP_NAME, CommonContext.getAeronDirectoryName());
         private boolean useResponseChannels = false;
+        private int consensusModuleAppVersion;
 
         public Builder withStaticNodes(final int nodeCount)
         {
@@ -2165,6 +2170,11 @@ public final class TestCluster implements AutoCloseable
             return this;
         }
 
+        public Builder withConsensusModuleAppVersion(int consensusModuleAppVersion) {
+            this.consensusModuleAppVersion = consensusModuleAppVersion;
+            return this;
+        }
+
         public TestCluster start()
         {
             return start(nodeCount);
@@ -2196,6 +2206,7 @@ public final class TestCluster implements AutoCloseable
             testCluster.markFileBaseDir(markFileBaseDir);
             testCluster.clusterBaseDir(clusterBaseDir);
             testCluster.replyStart(replayStart);
+            testCluster.consensusModuleAppVersion(consensusModuleAppVersion);
 
             try
             {
@@ -2245,6 +2256,10 @@ public final class TestCluster implements AutoCloseable
     {
         this.byHostInvalidInitialResolutions = byHostInvalidInitialResolutions;
         this.byMemberInvalidInitialResolutions = byMemberInvalidInitialResolutions;
+    }
+
+    private void consensusModuleAppVersion(int consensusModuleAppVersion) {
+        this.consensusModuleAppVersion = consensusModuleAppVersion;
     }
 
     private void acceptStandbySnapshots(final boolean acceptStandbySnapshots)

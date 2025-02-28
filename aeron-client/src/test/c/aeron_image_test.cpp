@@ -1077,11 +1077,11 @@ TEST_F(ImageTest, shouldCorrectlyCountReferences)
 {
     createImage();
 
-    EXPECT_EQ(1, aeron_image_refcnt_volatile(m_image));
-    EXPECT_EQ(1, aeron_image_incr_refcnt(m_image));
-    EXPECT_EQ(2, aeron_image_refcnt_volatile(m_image));
-    EXPECT_EQ(2, aeron_image_decr_refcnt(m_image));
-    EXPECT_EQ(1, aeron_image_refcnt_volatile(m_image));
+    EXPECT_EQ(1, aeron_image_refcnt_acquire(m_image));
+    EXPECT_EQ(2, aeron_image_incr_refcnt(m_image));
+    EXPECT_EQ(2, aeron_image_refcnt_acquire(m_image));
     EXPECT_EQ(1, aeron_image_decr_refcnt(m_image));
-    EXPECT_EQ(0, aeron_image_refcnt_volatile(m_image));
+    EXPECT_EQ(1, aeron_image_refcnt_acquire(m_image));
+    EXPECT_EQ(0, aeron_image_decr_refcnt(m_image));
+    EXPECT_EQ(0, aeron_image_refcnt_acquire(m_image));
 }

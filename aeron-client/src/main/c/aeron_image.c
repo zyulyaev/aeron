@@ -845,4 +845,4 @@ extern int64_t aeron_image_incr_refcnt(aeron_image_t *image);
 
 extern int64_t aeron_image_decr_refcnt(aeron_image_t *image);
 
-extern int64_t aeron_image_refcnt_volatile(aeron_image_t *image);
+extern int64_t aeron_image_refcnt_acquire(aeron_image_t *image);

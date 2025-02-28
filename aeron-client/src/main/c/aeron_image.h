@@ -126,17 +126,17 @@ inline int64_t aeron_image_incr_refcnt(aeron_image_t *image)
 {
     int64_t result;
     AERON_GET_AND_ADD_INT64(result, image->refcnt, INT64_C(1));
-    return result;
+    return result + 1;
 }
 
 inline int64_t aeron_image_decr_refcnt(aeron_image_t *image)
 {
     int64_t result;
     AERON_GET_AND_ADD_INT64(result, image->refcnt, INT64_C(-1));
-    return result;
+    return result - 1;
 }
 
-inline int64_t aeron_image_refcnt_volatile(aeron_image_t *image)
+inline int64_t aeron_image_refcnt_acquire(aeron_image_t *image)
 {
     int64_t value;
     AERON_GET_ACQUIRE(value, image->refcnt);

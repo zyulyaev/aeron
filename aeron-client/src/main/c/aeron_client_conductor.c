@@ -526,7 +526,7 @@ int aeron_client_conductor_check_lingering_resources(aeron_client_conductor_t *c
                 }
             }
 
-            if (aeron_image_refcnt_volatile(image) <= 0)
+            if (aeron_image_refcnt_acquire(image) <= 0)
             {
                 aeron_client_conductor_release_log_buffer(conductor, image->log_buffer);
                 aeron_image_delete(image);
@@ -806,10 +806,7 @@ int aeron_client_conductor_linger_or_delete_all_images(
     for (size_t i = 0; i < current_image_list->length; i++)
     {
         aeron_image_t *image = current_image_list->array[i];
-        int64_t refcnt;
-
-        aeron_image_decr_refcnt(image);
-        refcnt = aeron_image_refcnt_volatile(image);
+        int64_t refcnt = aeron_image_decr_refcnt(image);
 
         aeron_array_to_ptr_hash_map_remove(
             &conductor->image_by_key_map,

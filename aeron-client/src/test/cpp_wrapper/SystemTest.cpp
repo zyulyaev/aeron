@@ -331,11 +331,10 @@ TEST_P(SystemTestParameterized, shouldFreeUnavailableImage)
 
         raw_image =
             aeron_subscription_image_by_session_id(raw_subscription, publication->sessionId());
-        EXPECT_EQ(4, aeron_image_decr_refcnt(raw_image));
-        EXPECT_EQ(3, aeron_image_refcnt_volatile(raw_image));
+        EXPECT_EQ(3, aeron_image_decr_refcnt(raw_image));
     }
 
-    EXPECT_EQ(1, aeron_image_refcnt_volatile(raw_image));
+    EXPECT_EQ(1, aeron_image_refcnt_acquire(raw_image));
     EXPECT_EQ(1, subscription->imageCount());
     EXPECT_EQ(1, aeron_subscription_image_count(raw_subscription));
 

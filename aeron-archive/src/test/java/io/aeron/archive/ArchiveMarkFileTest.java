@@ -16,18 +16,19 @@
 package io.aeron.archive;
 
 import io.aeron.Aeron;
-import io.aeron.CommonContext;
 import io.aeron.archive.client.AeronArchive;
+import io.aeron.archive.client.ArchiveException;
 import io.aeron.archive.codecs.mark.MarkFileHeaderDecoder;
 import io.aeron.archive.codecs.mark.MarkFileHeaderEncoder;
 import io.aeron.archive.codecs.mark.MessageHeaderDecoder;
 import io.aeron.driver.MediaDriver;
-import io.aeron.exceptions.DriverTimeoutException;
+import io.aeron.driver.ThreadingMode;
 import io.aeron.test.TestContexts;
 import org.agrona.IoUtil;
 import org.agrona.MarkFile;
 import org.agrona.SemanticVersion;
 import org.agrona.SystemUtil;
+import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.CachedEpochClock;
 import org.agrona.concurrent.SystemEpochClock;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -44,11 +45,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ArchiveMarkFileTest
 {
+    private static final int ERROR_BUFFER_LENGTH = 4096;
+
     @Test
     void shouldUseMarkFileDirectory(final @TempDir File tempDir)
     {
@@ -78,12 +83,14 @@ class ArchiveMarkFileTest
         final File markFileDir = new File(tempDir, "mark-file-home");
 
         final MediaDriver.Context driverContext = new MediaDriver.Context()
-            .aeronDirectoryName(aeronDir.getAbsolutePath());
+            .aeronDirectoryName(aeronDir.getAbsolutePath())
+            .threadingMode(ThreadingMode.SHARED);
         final Archive.Context archiveContext = TestContexts.localhostArchive()
             .aeronDirectoryName(driverContext.aeronDirectoryName())
             .archiveDir(archiveDir)
             .markFileDir(markFileDir)
-            .epochClock(SystemEpochClock.INSTANCE);
+            .epochClock(SystemEpochClock.INSTANCE)
+            .threadingMode(ArchiveThreadingMode.SHARED);
 
         try (MediaDriver driver = MediaDriver.launch(driverContext.clone());
             Archive archive = Archive.launch(archiveContext.clone()))
@@ -104,29 +111,35 @@ class ArchiveMarkFileTest
 
     @Test
     @SuppressWarnings("try")
-    void anErrorOnStartupShouldNotLeaveAnUninitilisedMarkFile(final @TempDir File tempDir)
+    void anErrorOnStartupShouldNotLeaveAnUninitialisedMarkFile(final @TempDir File tempDir)
     {
-        System.setProperty(CommonContext.DRIVER_TIMEOUT_PROP_NAME, "100");
-
         final File aeronDir = new File(tempDir, "aeron");
         final File archiveDir = new File(tempDir, "archive_dir");
         final File markFileDir = new File(tempDir, "mark/file/dir");
         final File archiveMarkFile = new File(markFileDir, ArchiveMarkFile.FILENAME);
 
+        final Aeron.Context aeronContext = new Aeron.Context();
+        when(aeronContext.useConductorAgentInvoker()).thenReturn(false);
+        final Aeron aeron = mock(Aeron.class);
+        when(aeron.context()).thenReturn(aeronContext);
+
         final MediaDriver.Context driverContext = new MediaDriver.Context()
-            .aeronDirectoryName(aeronDir.getAbsolutePath());
+            .aeronDirectoryName(aeronDir.getAbsolutePath())
+            .threadingMode(ThreadingMode.SHARED);
         final Archive.Context archiveContext = TestContexts.localhostArchive()
             .aeronDirectoryName(driverContext.aeronDirectoryName())
             .archiveDir(archiveDir)
             .markFileDir(markFileDir)
-            .epochClock(SystemEpochClock.INSTANCE);
+            .threadingMode(ArchiveThreadingMode.SHARED)
+            .epochClock(SystemEpochClock.INSTANCE)
+            .aeron(aeron);
 
         // Force an error on startup by attempting to start an archive without a media driver.
         try (Archive ignored = Archive.launch(archiveContext.clone()))
         {
             fail("Expected archive to timeout as no media driver is running.");
         }
-        catch (final DriverTimeoutException ex)
+        catch (final ArchiveException ex)
         {
             // Should be able to read the mark file and the activity timestamp should not have been set.
             try (ArchiveMarkFile testMarkFile = new ArchiveMarkFile(archiveContext.clone()))
@@ -134,18 +147,14 @@ class ArchiveMarkFileTest
                 assertEquals(0, testMarkFile.activityTimestampVolatile());
             }
         }
-        finally
-        {
-            System.clearProperty(CommonContext.DRIVER_TIMEOUT_PROP_NAME);
-        }
 
         // Should be able to successfully start the archive
         try (MediaDriver ignored1 = MediaDriver.launch(driverContext.clone());
-            Archive archive = Archive.launch(archiveContext.clone()))
+            Archive archive = Archive.launch(archiveContext.clone().aeron(null)))
         {
             assertTrue(archiveMarkFile.exists());
             final long activityTimestamp = archive.context().archiveMarkFile().activityTimestampVolatile();
-            assertTrue(activityTimestamp > 0);
+            assertThat(activityTimestamp, greaterThan(0L));
         }
     }
 
@@ -316,6 +325,107 @@ class ArchiveMarkFileTest
             .aeronDirectoryName(aeronDirectory)
             .errorBufferLength(errorBufferLength);
         shouldEncodeMarkFileFromArchiveContext(context);
+    }
+
+    @Test
+    void shouldUnmapMarkFileBufferUponClose(final @TempDir Path tempDir)
+    {
+        final ArchiveMarkFile archiveMarkFile = new ArchiveMarkFile(
+            tempDir.resolve("archive.mark").toFile(),
+            ArchiveMarkFile.HEADER_LENGTH + ERROR_BUFFER_LENGTH,
+            ERROR_BUFFER_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+        assertFalse(archiveMarkFile.isClosed());
+
+        final MarkFileHeaderEncoder encoder = archiveMarkFile.encoder();
+        final MarkFileHeaderDecoder decoder = archiveMarkFile.decoder();
+        final AtomicBuffer errorBuffer = archiveMarkFile.errorBuffer();
+
+        assertSame(errorBuffer.byteBuffer(), encoder.buffer().byteBuffer());
+        assertSame(errorBuffer.byteBuffer(), decoder.buffer().byteBuffer());
+
+        archiveMarkFile.close();
+
+        assertTrue(archiveMarkFile.isClosed());
+        assertNull(errorBuffer.byteBuffer());
+        assertEquals(0, errorBuffer.capacity());
+        assertNull(encoder.buffer().byteBuffer());
+        assertEquals(0, encoder.buffer().capacity());
+        assertNull(decoder.buffer().byteBuffer());
+        assertEquals(0, decoder.buffer().capacity());
+
+        archiveMarkFile.close();
+        assertTrue(archiveMarkFile.isClosed());
+    }
+
+    @Test
+    void activityTimestamp(final @TempDir Path tempDir)
+    {
+        final ArchiveMarkFile archiveMarkFile = new ArchiveMarkFile(
+            tempDir.resolve("archive.mark").toFile(),
+            ArchiveMarkFile.HEADER_LENGTH + ERROR_BUFFER_LENGTH,
+            ERROR_BUFFER_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, archiveMarkFile.activityTimestampVolatile());
+        assertEquals(0, archiveMarkFile.decoder().activityTimestamp());
+
+        final long activityTimestamp = 7383439454305L;
+        archiveMarkFile.updateActivityTimestamp(activityTimestamp);
+        assertEquals(activityTimestamp, archiveMarkFile.activityTimestampVolatile());
+        assertEquals(activityTimestamp, archiveMarkFile.decoder().activityTimestamp());
+
+        archiveMarkFile.close();
+
+        archiveMarkFile.updateActivityTimestamp(1111);
+        assertEquals(Aeron.NULL_VALUE, archiveMarkFile.activityTimestampVolatile());
+    }
+
+    @Test
+    void archiveId(final @TempDir Path tempDir)
+    {
+        final ArchiveMarkFile archiveMarkFile = new ArchiveMarkFile(
+            tempDir.resolve("archive.mark").toFile(),
+            ArchiveMarkFile.HEADER_LENGTH + ERROR_BUFFER_LENGTH,
+            ERROR_BUFFER_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, archiveMarkFile.archiveId());
+        assertEquals(0, archiveMarkFile.decoder().archiveId());
+
+        final long archiveId = -462348234343L;
+        archiveMarkFile.encoder().archiveId(archiveId);
+        assertEquals(archiveId, archiveMarkFile.archiveId());
+        assertEquals(archiveId, archiveMarkFile.decoder().archiveId());
+
+        archiveMarkFile.close();
+
+        assertEquals(Aeron.NULL_VALUE, archiveMarkFile.archiveId());
+    }
+
+    @Test
+    void signalReady(final @TempDir Path tempDir)
+    {
+        final ArchiveMarkFile archiveMarkFile = new ArchiveMarkFile(
+            tempDir.resolve("archive.mark").toFile(),
+            ArchiveMarkFile.HEADER_LENGTH + ERROR_BUFFER_LENGTH,
+            ERROR_BUFFER_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, archiveMarkFile.decoder().version());
+
+        archiveMarkFile.signalReady();
+
+        assertEquals(ArchiveMarkFile.SEMANTIC_VERSION, archiveMarkFile.decoder().version());
+
+        archiveMarkFile.close();
+
+        archiveMarkFile.signalReady();
+        assertTrue(archiveMarkFile.isClosed());
     }
 
     private static void shouldEncodeMarkFileFromArchiveContext(final Archive.Context ctx)

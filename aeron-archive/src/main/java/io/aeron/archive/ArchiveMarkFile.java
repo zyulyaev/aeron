@@ -83,6 +83,7 @@ public class ArchiveMarkFile implements AutoCloseable
      * Name for a file contain a link to the directory containing the {@link MarkFile}.
      */
     public static final String LINK_FILENAME = "archive-mark.lnk";
+    private static final UnsafeBuffer EMPTY_BUFFER = new UnsafeBuffer();
 
     private static final int HEADER_OFFSET = MessageHeaderDecoder.ENCODED_LENGTH;
 
@@ -162,6 +163,7 @@ public class ArchiveMarkFile implements AutoCloseable
             }
             else
             {
+                headerDecoder.wrap(EMPTY_BUFFER, 0, 0, 0);
                 CloseHelper.close(markFile);
                 this.markFile = new MarkFile(
                     file,
@@ -173,7 +175,7 @@ public class ArchiveMarkFile implements AutoCloseable
                     epochClock,
                     null,
                     null);
-                this.buffer = markFile.buffer();
+                this.buffer = this.markFile.buffer();
                 this.buffer.setMemory(0, this.buffer.capacity(), (byte)0);
             }
         }
@@ -281,12 +283,21 @@ public class ArchiveMarkFile implements AutoCloseable
     {
         if (!markFile.isClosed())
         {
-            CloseHelper.close(markFile);
-            final UnsafeBuffer emptyBuffer = new UnsafeBuffer();
-            headerEncoder.wrap(emptyBuffer, 0);
-            headerDecoder.wrap(emptyBuffer, 0, 0, 0);
+            headerEncoder.wrap(EMPTY_BUFFER, 0);
+            headerDecoder.wrap(EMPTY_BUFFER, 0, 0, 0);
             errorBuffer.wrap(0, 0);
+            CloseHelper.close(markFile);
         }
+    }
+
+    /**
+     * Check if the {@link MarkFile} is closed.
+     *
+     * @return true if the {@link MarkFile} is closed.
+     */
+    public boolean isClosed()
+    {
+        return markFile.isClosed();
     }
 
     /**

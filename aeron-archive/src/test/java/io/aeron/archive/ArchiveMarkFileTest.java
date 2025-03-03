@@ -118,10 +118,8 @@ class ArchiveMarkFileTest
         final File markFileDir = new File(tempDir, "mark/file/dir");
         final File archiveMarkFile = new File(markFileDir, ArchiveMarkFile.FILENAME);
 
-        final Aeron.Context aeronContext = new Aeron.Context();
-        when(aeronContext.useConductorAgentInvoker()).thenReturn(false);
         final Aeron aeron = mock(Aeron.class);
-        when(aeron.context()).thenReturn(aeronContext);
+        when(aeron.context()).thenReturn(new Aeron.Context().useConductorAgentInvoker(false));
 
         final MediaDriver.Context driverContext = new MediaDriver.Context()
             .aeronDirectoryName(aeronDir.getAbsolutePath())

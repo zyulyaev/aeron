@@ -99,6 +99,8 @@ public final class ClusterMarkFile implements AutoCloseable
      */
     public static final String SERVICE_FILENAME_PREFIX = "cluster-mark-service-";
 
+    private static final UnsafeBuffer EMPTY_BUFFER = new UnsafeBuffer(0, 0);
+
     private static final int HEADER_OFFSET = MessageHeaderDecoder.ENCODED_LENGTH;
 
     private final MarkFileHeaderDecoder headerDecoder = new MarkFileHeaderDecoder();
@@ -188,8 +190,8 @@ public final class ClusterMarkFile implements AutoCloseable
             }
 
             final int existingErrorBufferLength = headerDecoder.errorBufferLength();
-            final UnsafeBuffer existingErrorBuffer = new UnsafeBuffer(
-                buffer, headerDecoder.headerLength(), existingErrorBufferLength);
+            final int headerLength = headerDecoder.headerLength();
+            final UnsafeBuffer existingErrorBuffer = new UnsafeBuffer(buffer, headerLength, existingErrorBufferLength);
 
             saveExistingErrors(file, existingErrorBuffer, type, CommonContext.fallbackLogger());
             existingErrorBuffer.setMemory(0, existingErrorBufferLength, (byte)0);
@@ -203,6 +205,7 @@ public final class ClusterMarkFile implements AutoCloseable
             }
             else
             {
+                headerDecoder.wrap(EMPTY_BUFFER, 0, 0, 0);
                 CloseHelper.close(markFile);
                 this.markFile = new MarkFile(
                     file,
@@ -215,7 +218,7 @@ public final class ClusterMarkFile implements AutoCloseable
                     null,
                     null);
                 this.buffer = this.markFile.buffer();
-                this.buffer.setMemory(0, headerDecoder.headerLength(), (byte)0);
+                this.buffer.setMemory(0, headerLength, (byte)0);
             }
         }
         else
@@ -332,11 +335,10 @@ public final class ClusterMarkFile implements AutoCloseable
     {
         if (!markFile.isClosed())
         {
-            CloseHelper.close(markFile);
-            final UnsafeBuffer emptyBuffer = new UnsafeBuffer();
-            headerEncoder.wrap(emptyBuffer, 0);
-            headerDecoder.wrap(emptyBuffer, 0, 0, 0);
+            headerEncoder.wrap(EMPTY_BUFFER, 0);
+            headerDecoder.wrap(EMPTY_BUFFER, 0, 0, 0);
             errorBuffer.wrap(0, 0);
+            CloseHelper.close(markFile);
         }
     }
 

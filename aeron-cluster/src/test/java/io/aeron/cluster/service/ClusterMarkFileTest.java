@@ -23,6 +23,7 @@ import org.agrona.IoUtil;
 import org.agrona.MarkFile;
 import org.agrona.SemanticVersion;
 import org.agrona.SystemUtil;
+import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.CachedEpochClock;
 import org.agrona.concurrent.SystemEpochClock;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -386,6 +387,9 @@ class ClusterMarkFileTest
         try (ClusterMarkFile clusterMarkFile =
             new ClusterMarkFile(file.toFile(), currentComponentType, ERROR_BUFFER_MIN_LENGTH * 2, epochClock, 1000))
         {
+            clusterMarkFile.memberId(8);
+            clusterMarkFile.clusterId(3);
+
             verifyMarkFileContents(
                 clusterMarkFile,
                 0,
@@ -398,11 +402,11 @@ class ClusterMarkFileTest
                 0,
                 0,
                 0,
-                0,
+                8,
                 0,
                 ClusterMarkFile.HEADER_LENGTH,
                 ERROR_BUFFER_MIN_LENGTH * 2,
-                0,
+                3,
                 "",
                 "",
                 "",
@@ -410,6 +414,227 @@ class ClusterMarkFileTest
                 "",
                 "");
         }
+    }
+
+    @Test
+    void shouldUnmapBufferUponClose()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        final MarkFileHeaderEncoder encoder = clusterMarkFile.encoder();
+        final MarkFileHeaderDecoder decoder = clusterMarkFile.decoder();
+        final AtomicBuffer errorBuffer = clusterMarkFile.errorBuffer();
+
+        assertNotNull(errorBuffer.byteBuffer());
+        assertSame(errorBuffer.byteBuffer(), encoder.buffer().byteBuffer());
+        assertSame(errorBuffer.byteBuffer(), decoder.buffer().byteBuffer());
+
+        clusterMarkFile.close();
+
+        assertTrue(clusterMarkFile.isClosed());
+        assertNull(errorBuffer.byteBuffer());
+        assertEquals(0, errorBuffer.capacity());
+        assertNull(encoder.buffer().byteBuffer());
+        assertEquals(0, encoder.buffer().capacity());
+        assertNull(decoder.buffer().byteBuffer());
+        assertEquals(0, decoder.buffer().capacity());
+
+        clusterMarkFile.close();
+
+        assertTrue(clusterMarkFile.isClosed());
+    }
+
+    @Test
+    void clusterIdAccessors()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, clusterMarkFile.clusterId());
+
+        clusterMarkFile.clusterId(42);
+        assertEquals(42, clusterMarkFile.clusterId());
+
+        clusterMarkFile.encoder().clusterId(123);
+        assertEquals(123, clusterMarkFile.clusterId());
+        assertEquals(123, clusterMarkFile.decoder().clusterId());
+
+        clusterMarkFile.close();
+
+        clusterMarkFile.clusterId(2);
+        assertEquals(Aeron.NULL_VALUE, clusterMarkFile.clusterId());
+    }
+
+    @Test
+    void memberIdAccessors()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, clusterMarkFile.memberId());
+
+        clusterMarkFile.memberId(7);
+        assertEquals(7, clusterMarkFile.memberId());
+
+        clusterMarkFile.encoder().memberId(-5);
+        assertEquals(-5, clusterMarkFile.memberId());
+        assertEquals(-5, clusterMarkFile.decoder().memberId());
+
+        clusterMarkFile.close();
+
+        clusterMarkFile.memberId(111);
+        assertEquals(Aeron.NULL_VALUE, clusterMarkFile.memberId());
+    }
+
+    @Test
+    void candidateTermIdAccessors()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(Aeron.NULL_VALUE, clusterMarkFile.candidateTermId());
+
+        clusterMarkFile.encoder().candidateTermId(123);
+        assertEquals(123, clusterMarkFile.candidateTermId());
+        assertEquals(123, clusterMarkFile.decoder().candidateTermId());
+
+        clusterMarkFile.close();
+
+        assertEquals(Aeron.NULL_VALUE, clusterMarkFile.candidateTermId());
+    }
+
+    @Test
+    void activityTimestampAccessors()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, clusterMarkFile.activityTimestampVolatile());
+
+        clusterMarkFile.updateActivityTimestamp(4444555555L);
+        assertEquals(4444555555L, clusterMarkFile.activityTimestampVolatile());
+
+        clusterMarkFile.encoder().activityTimestamp(439856438756348L);
+        assertEquals(439856438756348L, clusterMarkFile.activityTimestampVolatile());
+        assertEquals(439856438756348L, clusterMarkFile.decoder().activityTimestamp());
+
+        clusterMarkFile.close();
+
+        clusterMarkFile.updateActivityTimestamp(222);
+        assertEquals(Aeron.NULL_VALUE, clusterMarkFile.activityTimestampVolatile());
+    }
+
+    @Test
+    void loadControlPropertiesAccessors()
+    {
+        final String controlChannel = "aeron:udp?endpoint=192.168.0.10:5555";
+        final int memberId = 42;
+        final int serviceStreamId = 61;
+        final int consensusModuleStreamId = 4;
+        final String aeronDir = "/dev/shm/aeron";
+        final String ingressChannel = "aeron:udp?endpoint=localhost:8080";
+        final String clusterDir = "/data/cluster/dir";
+
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        clusterMarkFile.encoder()
+            .clusterId(123)
+            .memberId(memberId)
+            .serviceId(7)
+            .candidateTermId(-5)
+            .serviceStreamId(serviceStreamId)
+            .consensusModuleStreamId(consensusModuleStreamId)
+            .aeronDirectory(aeronDir)
+            .controlChannel(controlChannel)
+            .ingressChannel(ingressChannel)
+            .serviceName("test")
+            .authenticator("authenticator")
+            .servicesClusterDir(clusterDir);
+
+        clusterMarkFile.decoder().skipAeronDirectory();
+        clusterMarkFile.decoder().skipControlChannel();
+        assertEquals(ingressChannel, clusterMarkFile.decoder().ingressChannel());
+        clusterMarkFile.decoder().skipServiceName();
+        clusterMarkFile.decoder().skipAuthenticator();
+        assertEquals(clusterDir, clusterMarkFile.decoder().servicesClusterDir());
+
+        final ClusterNodeControlProperties controlProperties = clusterMarkFile.loadControlProperties();
+        assertNotNull(controlProperties);
+        assertEquals(memberId, controlProperties.memberId);
+        assertEquals(serviceStreamId, controlProperties.serviceStreamId);
+        assertEquals(consensusModuleStreamId, controlProperties.consensusModuleStreamId);
+        assertEquals(aeronDir, controlProperties.aeronDirectoryName);
+        assertEquals(controlChannel, controlProperties.controlChannel);
+
+        clusterMarkFile.close();
+
+        assertNull(clusterMarkFile.loadControlProperties());
+    }
+
+    @Test
+    void signalReady()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, clusterMarkFile.decoder().version());
+
+        clusterMarkFile.signalReady();
+        assertEquals(ClusterMarkFile.SEMANTIC_VERSION, clusterMarkFile.decoder().version());
+
+        clusterMarkFile.close();
+
+        clusterMarkFile.signalReady();
+    }
+
+    @Test
+    void signalFailedStart()
+    {
+        final ClusterMarkFile clusterMarkFile = new ClusterMarkFile(
+            tempDir.resolve("test-mark.file").toFile(),
+            ClusterComponentType.STANDBY,
+            ERROR_BUFFER_MIN_LENGTH,
+            SystemEpochClock.INSTANCE,
+            100);
+
+        assertEquals(0, clusterMarkFile.decoder().version());
+
+        clusterMarkFile.signalFailedStart();
+        assertEquals(ClusterMarkFile.VERSION_FAILED, clusterMarkFile.decoder().version());
+
+        clusterMarkFile.close();
+
+        clusterMarkFile.signalFailedStart();
     }
 
     private static void verifyMarkFileContents(

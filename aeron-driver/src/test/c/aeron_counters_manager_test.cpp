@@ -17,8 +17,6 @@
 #include <array>
 #include <cstdint>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
 
 #include <gtest/gtest.h>
 
@@ -86,6 +84,36 @@ void func_should_never_be_called(
     void *clientd)
 {
     FAIL();
+}
+
+static void test_concurrent_aeron_counter_increment(
+    int num_threads, size_t iterations, std::atomic<int>& started_threads, int64_t *addr)
+{
+    started_threads++;
+    while (started_threads < num_threads)
+    {
+        std::this_thread::yield();
+    }
+
+    for (size_t j = 0; j < iterations; j++)
+    {
+        aeron_counter_increment(addr);
+    }
+}
+
+static void test_concurrent_aeron_counter_get_and_add(
+    int num_threads, size_t iterations, std::atomic<int>& started_threads, int64_t *addr, int64_t value)
+{
+    started_threads++;
+    while (started_threads < num_threads)
+    {
+        std::this_thread::yield();
+    }
+
+    for (size_t j = 0; j < iterations; j++)
+    {
+        aeron_counter_get_and_add(addr, value);
+    }
 }
 
 TEST_F(CountersManagerTest, shouldNotIterateOverEmptyCounters)
@@ -241,19 +269,7 @@ TEST_F(CountersManagerTest, shouldIncrementValueWithVolatileSemantics)
     std::atomic<int> started_threads(0);
     for (int i = 0; i < num_threads; i++)
     {
-        std::thread x([&addr, &started_threads]
-        {
-            started_threads++;
-            while (started_threads < num_threads)
-            {
-                std::this_thread::yield();
-            }
-
-            for (size_t j = 0; j < iterations; j++)
-            {
-                aeron_counter_increment(addr);
-            }
-        });
+        std::thread x(test_concurrent_aeron_counter_increment, num_threads, iterations, std::ref(started_threads), addr);
         threads.push_back(std::move(x));
     }
 
@@ -317,22 +333,10 @@ TEST_F(CountersManagerTest, shouldGetAndAddValueWithVolatileSemantics)
     const int num_threads = 2;
     const size_t iterations = 777777;
     std::atomic<int> started_threads(0);
-    auto work = [&addr, &started_threads](const int64_t value)
-    {
-        started_threads++;
-        while (started_threads < num_threads)
-        {
-            std::this_thread::yield();
-        }
-
-        for (size_t j = 0; j < iterations; j++)
-        {
-            aeron_counter_get_and_add(addr, value);
-        }
-    };
 
     const int64_t v1 = 19, v2 = 64;
-    std::thread t1(work, v1), t2(work, v2);
+    std::thread t1(test_concurrent_aeron_counter_get_and_add, num_threads, iterations, std::ref(started_threads), addr, v1);
+    std::thread t2(test_concurrent_aeron_counter_get_and_add, num_threads, iterations, std::ref(started_threads), addr, v2);
 
     t1.join();
     t2.join();

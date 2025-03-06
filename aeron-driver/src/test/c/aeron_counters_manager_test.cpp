@@ -241,7 +241,7 @@ TEST_F(CountersManagerTest, shouldIncrementValueWithVolatileSemantics)
     std::atomic<int> started_threads(0);
     for (int i = 0; i < num_threads; i++)
     {
-        std::thread x([&addr, &started_threads, &num_threads, &iterations]
+        std::thread x([&addr, &started_threads]
         {
             started_threads++;
             while (started_threads < num_threads)
@@ -317,7 +317,7 @@ TEST_F(CountersManagerTest, shouldGetAndAddValueWithVolatileSemantics)
     const int num_threads = 2;
     const size_t iterations = 777777;
     std::atomic<int> started_threads(0);
-    auto work = [&addr, &started_threads, &num_threads, &iterations](const int64_t value)
+    auto work = [&addr, &started_threads](const int64_t value)
     {
         started_threads++;
         while (started_threads < num_threads)

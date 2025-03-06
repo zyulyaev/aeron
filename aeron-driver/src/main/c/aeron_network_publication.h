@@ -252,7 +252,7 @@ inline int64_t aeron_network_publication_producer_position(aeron_network_publica
 
 inline int64_t aeron_network_publication_join_position(aeron_network_publication_t *publication)
 {
-    return aeron_counter_get_volatile(publication->snd_pos_position.value_addr);
+    return aeron_counter_get_acquire(publication->snd_pos_position.value_addr);
 }
 
 inline void aeron_network_publication_trigger_send_setup_frame(
@@ -309,7 +309,7 @@ inline int64_t aeron_network_publication_max_spy_position(aeron_network_publicat
     for (size_t i = 0, length = publication->conductor_fields.subscribable.length; i < length; i++)
     {
         aeron_tetherable_position_t *tetherable_position = &publication->conductor_fields.subscribable.array[i];
-        int64_t spy_position = aeron_counter_get_volatile(tetherable_position->value_addr);
+        int64_t spy_position = aeron_counter_get_acquire(tetherable_position->value_addr);
 
         if (AERON_SUBSCRIPTION_TETHER_RESTING != tetherable_position->state)
         {
@@ -325,8 +325,8 @@ inline bool aeron_network_publication_is_accepting_subscriptions(aeron_network_p
     return AERON_NETWORK_PUBLICATION_STATE_ACTIVE == publication->conductor_fields.state ||
         (AERON_NETWORK_PUBLICATION_STATE_DRAINING == publication->conductor_fields.state &&
             aeron_driver_subscribable_has_working_positions(&publication->conductor_fields.subscribable) &&
-            aeron_network_publication_producer_position(publication) >
-                aeron_counter_get_volatile(publication->snd_pos_position.value_addr));
+         aeron_network_publication_producer_position(publication) >
+             aeron_counter_get_acquire(publication->snd_pos_position.value_addr));
 }
 
 inline int64_t aeron_network_publication_registration_id(aeron_network_publication_t *publication)

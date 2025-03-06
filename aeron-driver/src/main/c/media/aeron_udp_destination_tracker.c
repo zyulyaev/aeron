@@ -90,7 +90,7 @@ static void aeron_udp_destination_tracker_remove_inactive_destinations(
                 last_index--;
                 tracker->destinations.length--;
 
-                aeron_counter_set_ordered(tracker->num_destinations_addr, (int64_t)tracker->destinations.length);
+                aeron_counter_set_release(tracker->num_destinations_addr, (int64_t) tracker->destinations.length);
             }
         }
     }
@@ -248,7 +248,7 @@ int aeron_udp_destination_tracker_add_destination(
         memcpy(&entry->addr, addr, sizeof(struct sockaddr_storage));
     }
 
-    aeron_counter_set_ordered(tracker->num_destinations_addr, (int64_t)tracker->destinations.length);
+    aeron_counter_set_release(tracker->num_destinations_addr, (int64_t) tracker->destinations.length);
 
     return result;
 }
@@ -343,7 +343,7 @@ int aeron_udp_destination_tracker_remove_destination(
         }
     }
 
-    aeron_counter_set_ordered(tracker->num_destinations_addr, (int64_t)tracker->destinations.length);
+    aeron_counter_set_release(tracker->num_destinations_addr, (int64_t) tracker->destinations.length);
 
     return 0;
 }
@@ -372,7 +372,7 @@ int aeron_udp_destination_tracker_remove_destination_by_id(
         }
     }
 
-    aeron_counter_set_ordered(tracker->num_destinations_addr, (int64_t)tracker->destinations.length);
+    aeron_counter_set_release(tracker->num_destinations_addr, (int64_t) tracker->destinations.length);
 
     return 0;
 }

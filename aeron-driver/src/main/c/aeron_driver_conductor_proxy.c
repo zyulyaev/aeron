@@ -26,7 +26,7 @@ void aeron_driver_conductor_proxy_offer(aeron_driver_conductor_proxy_t *conducto
     aeron_rb_write_result_t result;
     while (AERON_RB_FULL == (result = aeron_mpsc_rb_write(conductor_proxy->command_queue, 1, cmd, length)))
     {
-        aeron_counter_ordered_increment(conductor_proxy->fail_counter, 1);
+        aeron_counter_increment_release(conductor_proxy->fail_counter);
         sched_yield();
     }
 

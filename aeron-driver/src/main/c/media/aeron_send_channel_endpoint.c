@@ -216,7 +216,7 @@ int aeron_send_channel_endpoint_create(
         return -1;
     }
 
-    aeron_counter_set_ordered(
+    aeron_counter_set_release(
         _endpoint->local_sockaddr_indicator.value_addr, AERON_COUNTER_CHANNEL_ENDPOINT_STATUS_ACTIVE);
 
     _endpoint->sender_proxy = context->sender_proxy;
@@ -396,11 +396,11 @@ void aeron_send_channel_endpoint_dispatch(
             if (length >= sizeof(aeron_nak_header_t))
             {
                 result = aeron_send_channel_endpoint_on_nak(endpoint, buffer, length, addr);
-                aeron_counter_ordered_increment(sender->nak_messages_received_counter, 1);
+                aeron_counter_increment_release(sender->nak_messages_received_counter);
             }
             else
             {
-                aeron_counter_increment(sender->invalid_frames_counter, 1);
+                aeron_counter_increment(sender->invalid_frames_counter);
             }
             break;
 
@@ -408,11 +408,11 @@ void aeron_send_channel_endpoint_dispatch(
             if (length >= sizeof(aeron_status_message_header_t) && length >= (size_t)frame_header->frame_length)
             {
                 result = aeron_send_channel_endpoint_on_status_message(endpoint, conductor_proxy, buffer, length, addr);
-                aeron_counter_ordered_increment(sender->status_messages_received_counter, 1);
+                aeron_counter_increment_release(sender->status_messages_received_counter);
             }
             else
             {
-                aeron_counter_increment(sender->invalid_frames_counter, 1);
+                aeron_counter_increment(sender->invalid_frames_counter);
             }
             break;
 
@@ -420,11 +420,11 @@ void aeron_send_channel_endpoint_dispatch(
             if (length >= sizeof(aeron_error_t) && length >= (size_t)frame_header->frame_length)
             {
                 result = aeron_send_channel_endpoint_on_error(endpoint, conductor_proxy, buffer, length, addr);
-                aeron_counter_ordered_increment(sender->error_messages_received_counter, 1);
+                aeron_counter_increment_release(sender->error_messages_received_counter);
             }
             else
             {
-                aeron_counter_increment(sender->invalid_frames_counter, 1);
+                aeron_counter_increment(sender->invalid_frames_counter);
             }
             break;
 
@@ -435,7 +435,7 @@ void aeron_send_channel_endpoint_dispatch(
             }
             else
             {
-                aeron_counter_increment(sender->invalid_frames_counter, 1);
+                aeron_counter_increment(sender->invalid_frames_counter);
             }
             break;
 
@@ -446,7 +446,7 @@ void aeron_send_channel_endpoint_dispatch(
             }
             else
             {
-                aeron_counter_increment(sender->invalid_frames_counter, 1);
+                aeron_counter_increment(sender->invalid_frames_counter);
             }
             break;
 

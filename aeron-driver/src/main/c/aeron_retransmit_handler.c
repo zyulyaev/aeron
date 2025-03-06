@@ -85,7 +85,7 @@ bool aeron_retransmit_handler_is_invalid(aeron_retransmit_handler_t *handler, in
 
     if (is_invalid)
     {
-        aeron_counter_increment(handler->invalid_packets_counter, 1);
+        aeron_counter_increment(handler->invalid_packets_counter);
     }
 
     return is_invalid;
@@ -230,7 +230,7 @@ int aeron_retransmit_handler_scan_for_available_retransmit(
             return 0;
         }
 
-        aeron_counter_add_ordered(handler->retransmit_overflow_counter, 1);
+        aeron_counter_get_and_add_release(handler->retransmit_overflow_counter, 1);
         *actionp = NULL;
     }
     else

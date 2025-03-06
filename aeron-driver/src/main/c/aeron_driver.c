@@ -895,11 +895,11 @@ int aeron_driver_init(aeron_driver_t **driver, aeron_driver_context_t *context)
 
     _driver->context->receiver_proxy = &_driver->receiver.receiver_proxy;
 
-    aeron_counter_set_ordered(
+    aeron_counter_set_release(
         aeron_system_counter_addr(context->system_counters, AERON_SYSTEM_COUNTER_AERON_VERSION),
         aeron_semantic_version_compose(aeron_version_major(), aeron_version_minor(), aeron_version_patch()));
 
-    aeron_counter_set_ordered(
+    aeron_counter_set_release(
         aeron_system_counter_addr(context->system_counters, AERON_SYSTEM_COUNTER_BYTES_CURRENTLY_MAPPED),
         (int64_t)(_driver->context->cnc_map.length + _driver->context->loss_report_length));
 

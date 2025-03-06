@@ -467,7 +467,7 @@ int aeron_client_conductor_check_liveness(aeron_client_conductor_t *conductor, l
                 conductor->heartbeat_timestamp.addr = aeron_counters_reader_addr(
                     &conductor->counters_reader, conductor->heartbeat_timestamp.counter_id);
 
-                aeron_counter_set_ordered(conductor->heartbeat_timestamp.addr, now_ms);
+                aeron_counter_set_release(conductor->heartbeat_timestamp.addr, now_ms);
                 conductor->time_of_last_keepalive_ns = now_ns;
             }
         }
@@ -487,7 +487,7 @@ int aeron_client_conductor_check_liveness(aeron_client_conductor_t *conductor, l
                 return -1;
             }
 
-            aeron_counter_set_ordered(conductor->heartbeat_timestamp.addr, now_ms);
+            aeron_counter_set_release(conductor->heartbeat_timestamp.addr, now_ms);
             conductor->time_of_last_keepalive_ns = now_ns;
         }
 

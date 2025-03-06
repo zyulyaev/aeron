@@ -141,8 +141,8 @@ int64_t aeron_min_flow_control_strategy_on_idle(
         strategy_state->receivers.length = receiver_count;
         bool has_required_receivers = receiver_count >= (size_t)strategy_state->group_min_size;
         AERON_SET_RELEASE(strategy_state->has_required_receivers, has_required_receivers);
-        aeron_counter_set_ordered(
-            strategy_state->receivers_counter.value_addr, (int64_t)strategy_state->receivers.length);
+        aeron_counter_set_release(
+            strategy_state->receivers_counter.value_addr, (int64_t) strategy_state->receivers.length);
     }
 
     return strategy_state->receivers.length < (size_t)strategy_state->group_min_size ||
@@ -231,8 +231,8 @@ int64_t aeron_min_flow_control_strategy_process_sm(
                     strategy_state->receivers.length);
             }
 
-            aeron_counter_set_ordered(
-                strategy_state->receivers_counter.value_addr, (int64_t)strategy_state->receivers.length);
+            aeron_counter_set_release(
+                strategy_state->receivers_counter.value_addr, (int64_t) strategy_state->receivers.length);
         }
     }
 
@@ -497,7 +497,7 @@ int aeron_tagged_flow_control_strategy_allocate_receiver_counter(
 
     strategy_state->receivers_counter.counter_id = counter_id;
     strategy_state->receivers_counter.value_addr = aeron_counters_manager_addr(counters_manager, counter_id);
-    aeron_counter_set_ordered(strategy_state->receivers_counter.value_addr, 0);
+    aeron_counter_set_release(strategy_state->receivers_counter.value_addr, 0);
 
     return 0;
 }

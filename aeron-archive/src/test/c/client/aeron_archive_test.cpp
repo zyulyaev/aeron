@@ -1337,7 +1337,7 @@ TEST_F(AeronCArchiveTest, shouldRecordThenBoundedReplay)
         int64_t position = 0;
         int64_t length = stop_position - position;
         int64_t bounded_length = (length / 4) * 3;
-        aeron_counter_set_ordered(aeron_counter_addr(counter), bounded_length);
+        aeron_counter_set_release(aeron_counter_addr(counter), bounded_length);
 
         aeron_subscription_t *subscription = addSubscription(m_replayChannel, m_replayStreamId);
 
@@ -3300,7 +3300,7 @@ TEST_P(AeronCArchiveParamTest, shouldBoundedReplayWithResponseChannel)
         aeron_async_add_counter_poll(&counter, async_add_counter);
     }
 
-    aeron_counter_set_ordered(aeron_counter_addr(counter), halfway_position);
+    aeron_counter_set_release(aeron_counter_addr(counter), halfway_position);
 
     int64_t position = 0L;
     int64_t length = stop_position - position;
@@ -3438,7 +3438,7 @@ TEST_P(AeronCArchiveParamTest, shouldStartBoundedReplayWithResponseChannel)
         aeron_async_add_counter_poll(&counter, async_add_counter);
     }
 
-    aeron_counter_set_ordered(aeron_counter_addr(counter), halfway_position);
+    aeron_counter_set_release(aeron_counter_addr(counter), halfway_position);
 
     aeron_subscription_t *subscription = addSubscription(response_channel, m_replayStreamId);
 

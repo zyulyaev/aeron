@@ -22,7 +22,7 @@
 #include "aeron_log_buffer.h"
 #include "status/aeron_local_sockaddr.h"
 
-static inline void aeron_put_raw_tail_ordered(volatile int64_t *addr, int32_t term_id, int32_t term_offset)
+static inline void aeron_put_raw_tail_release(volatile int64_t *addr, int32_t term_id, int32_t term_offset)
 {
     AERON_SET_RELEASE(*addr, ((uint64_t)term_id << 32 | term_offset));
 }
@@ -87,7 +87,7 @@ static inline int32_t aeron_append_unfragmented_message(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + aligned_frame_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -130,7 +130,7 @@ static inline int32_t aeron_append_fragmented_message(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + (int32_t)framed_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -198,7 +198,7 @@ static inline int32_t aeron_append_unfragmented_messagev(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + aligned_frame_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -249,7 +249,7 @@ static inline int32_t aeron_append_fragmented_messagev(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + (int32_t)framed_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -335,7 +335,7 @@ static inline int32_t aeron_claim(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + aligned_frame_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -367,7 +367,7 @@ static inline int32_t aeron_append_padding(
     const int32_t term_length = (int32_t)term_buffer->length;
 
     int32_t resulting_offset = term_offset + aligned_frame_length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     if (resulting_offset > term_length)
     {
@@ -395,7 +395,7 @@ static inline int32_t aeron_append_block(
     int32_t term_id)
 {
     int32_t resulting_offset = term_offset + (int32_t)length;
-    aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+    aeron_put_raw_tail_release(term_tail_counter, term_id, resulting_offset);
 
     aeron_data_header_as_longs_t *dest_hdr_as_longs = (aeron_data_header_as_longs_t *)term_buffer->addr;
     aeron_data_header_as_longs_t *src_hdr_as_longs = (aeron_data_header_as_longs_t *)buffer;
@@ -533,7 +533,7 @@ int64_t aeron_exclusive_publication_offer(
     AERON_GET_ACQUIRE(is_closed, publication->is_closed);
     if (!is_closed)
     {
-        const int64_t limit = aeron_counter_get_volatile(publication->position_limit);
+        const int64_t limit = aeron_counter_get_acquire(publication->position_limit);
         const int32_t term_offset = publication->term_offset;
         const int64_t position = publication->term_begin_position + term_offset;
         const size_t index = publication->active_partition_index;
@@ -621,7 +621,7 @@ int64_t aeron_exclusive_publication_offerv(
     AERON_GET_ACQUIRE(is_closed, publication->is_closed);
     if (!is_closed)
     {
-        const int64_t limit = aeron_counter_get_volatile(publication->position_limit);
+        const int64_t limit = aeron_counter_get_acquire(publication->position_limit);
         const int32_t term_offset = publication->term_offset;
         const int64_t position = publication->term_begin_position + term_offset;
         const size_t index = publication->active_partition_index;
@@ -708,7 +708,7 @@ int64_t aeron_exclusive_publication_try_claim(
     AERON_GET_ACQUIRE(is_closed, publication->is_closed);
     if (!is_closed)
     {
-        const int64_t limit = aeron_counter_get_volatile(publication->position_limit);
+        const int64_t limit = aeron_counter_get_acquire(publication->position_limit);
         const int32_t term_offset = publication->term_offset;
         const int64_t position = publication->term_begin_position + term_offset;
         const size_t index = publication->active_partition_index;
@@ -760,7 +760,7 @@ int64_t aeron_exclusive_publication_append_padding(aeron_exclusive_publication_t
     AERON_GET_ACQUIRE(is_closed, publication->is_closed);
     if (!is_closed)
     {
-        const int64_t limit = aeron_counter_get_volatile(publication->position_limit);
+        const int64_t limit = aeron_counter_get_acquire(publication->position_limit);
         const int32_t term_offset = publication->term_offset;
         const int64_t position = publication->term_begin_position + term_offset;
         const size_t index = publication->active_partition_index;
@@ -808,7 +808,7 @@ int64_t aeron_exclusive_publication_offer_block(
         aeron_exclusive_publication_rotate_term(publication);
     }
 
-    const int64_t limit = aeron_counter_get_volatile(publication->position_limit);
+    const int64_t limit = aeron_counter_get_acquire(publication->position_limit);
     const int32_t term_offset = publication->term_offset;
     const int64_t position = publication->term_begin_position + term_offset;
     const size_t index = publication->active_partition_index;
@@ -968,7 +968,7 @@ int64_t aeron_exclusive_publication_position_limit(aeron_exclusive_publication_t
         return AERON_PUBLICATION_CLOSED;
     }
 
-    return aeron_counter_get_volatile(publication->position_limit);
+    return aeron_counter_get_acquire(publication->position_limit);
 }
 
 int aeron_exclusive_publication_local_sockaddrs(

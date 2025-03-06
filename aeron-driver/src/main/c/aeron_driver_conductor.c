@@ -1162,7 +1162,7 @@ aeron_client_t *aeron_driver_conductor_get_or_add_client(aeron_driver_conductor_
                 client->heartbeat_timestamp.counter_id = client_heartbeat.counter_id;
                 client->heartbeat_timestamp.value_addr = client_heartbeat.value_addr;
                 const int64_t now_ms = aeron_clock_cached_epoch_time(conductor->context->cached_clock);
-                aeron_counter_set_ordered(client->heartbeat_timestamp.value_addr, now_ms);
+                aeron_counter_set_release(client->heartbeat_timestamp.value_addr, now_ms);
 
                 client->client_liveness_timeout_ms = conductor->context->client_liveness_timeout_ns < 1000000 ?
                     1 : (int64_t)(conductor->context->client_liveness_timeout_ns / 1000000);
@@ -1189,14 +1189,14 @@ aeron_client_t *aeron_driver_conductor_get_or_add_client(aeron_driver_conductor_
 void aeron_client_on_time_event(
     aeron_driver_conductor_t *conductor, aeron_client_t *client, int64_t now_ns, int64_t now_ms)
 {
-    int64_t timestamp_ms = aeron_counter_get_volatile(client->heartbeat_timestamp.value_addr);
+    int64_t timestamp_ms = aeron_counter_get_acquire(client->heartbeat_timestamp.value_addr);
     if (now_ms > (timestamp_ms + client->client_liveness_timeout_ms))
     {
         client->reached_end_of_life = true;
 
         if (!client->closed_by_command)
         {
-            aeron_counter_ordered_increment(conductor->client_timeouts_counter, 1);
+            aeron_counter_increment_release(conductor->client_timeouts_counter);
             aeron_driver_conductor_on_client_timeout(conductor, client->client_id);
         }
 
@@ -1356,7 +1356,7 @@ void aeron_driver_conductor_log_explicit_error(
     const char *description)
 {
     aeron_distinct_error_log_record(&conductor->error_log, error_code, description);
-    aeron_counter_increment(conductor->errors_counter, 1);
+    aeron_counter_increment(conductor->errors_counter);
     aeron_err_clear();
 }
 
@@ -1831,7 +1831,7 @@ void aeron_driver_conductor_add_end_of_life_resource(
     end_of_life_resource.free_func = free_func;
     if (aeron_deque_add_last(&conductor->end_of_life_queue, (void *)&end_of_life_resource) < 0)
     {
-        aeron_counter_ordered_increment(counter, 1);
+        aeron_counter_increment_release(counter);
     }
 }
 
@@ -1851,7 +1851,7 @@ int aeron_driver_conductor_free_end_of_life_resources(aeron_driver_conductor_t *
         if (!end_of_life_resource.free_func(end_of_life_resource.resource))
         {
             int64_t *counter = aeron_system_counter_addr(&conductor->system_counters, AERON_SYSTEM_COUNTER_FREE_FAILS);
-            aeron_counter_ordered_increment(counter, 1);
+            aeron_counter_increment_release(counter);
             aeron_deque_add_last(&conductor->end_of_life_queue, (void *)&end_of_life_resource);
         }
     }
@@ -2024,8 +2024,8 @@ aeron_ipc_publication_t *aeron_driver_conductor_get_or_add_ipc_publication(
                         (size_t)aeron_number_of_trailing_zeroes((int32_t)params->term_length),
                         initial_term_id);
 
-                    aeron_counter_set_ordered(pub_pos_position.value_addr, position);
-                    aeron_counter_set_ordered(pub_lmt_position.value_addr, position);
+                    aeron_counter_set_release(pub_pos_position.value_addr, position);
+                    aeron_counter_set_release(pub_lmt_position.value_addr, position);
                 }
 
                 if (aeron_ipc_publication_create(
@@ -2302,10 +2302,10 @@ aeron_network_publication_t *aeron_driver_conductor_get_or_add_network_publicati
                         (size_t)aeron_number_of_trailing_zeroes((int32_t)params->term_length),
                         initial_term_id);
 
-                    aeron_counter_set_ordered(pub_pos_position.value_addr, position);
-                    aeron_counter_set_ordered(pub_lmt_position.value_addr, position);
-                    aeron_counter_set_ordered(snd_pos_position.value_addr, position);
-                    aeron_counter_set_ordered(snd_lmt_position.value_addr, position);
+                    aeron_counter_set_release(pub_pos_position.value_addr, position);
+                    aeron_counter_set_release(pub_lmt_position.value_addr, position);
+                    aeron_counter_set_release(snd_pos_position.value_addr, position);
+                    aeron_counter_set_release(snd_lmt_position.value_addr, position);
                 }
 
                 if (pub_lmt_position.counter_id >= 0 &&
@@ -2463,7 +2463,7 @@ aeron_send_channel_endpoint_t *aeron_driver_conductor_get_or_add_send_channel_en
         aeron_driver_sender_proxy_on_add_endpoint(conductor->context->sender_proxy, endpoint);
         conductor->send_channel_endpoints.array[conductor->send_channel_endpoints.length++].endpoint = endpoint;
 
-        aeron_counter_set_ordered(endpoint->channel_status.value_addr, AERON_COUNTER_CHANNEL_ENDPOINT_STATUS_ACTIVE);
+        aeron_counter_set_release(endpoint->channel_status.value_addr, AERON_COUNTER_CHANNEL_ENDPOINT_STATUS_ACTIVE);
     }
     else
     {
@@ -3634,7 +3634,7 @@ void aeron_driver_conductor_on_check_for_blocked_driver_commands(aeron_driver_co
         {
             if (aeron_mpsc_rb_unblock(&conductor->to_driver_commands))
             {
-                aeron_counter_ordered_increment(conductor->unblocked_commands_counter, 1);
+                aeron_counter_increment_release(conductor->unblocked_commands_counter);
             }
         }
     }
@@ -3892,7 +3892,7 @@ int aeron_driver_conductor_link_subscribable(
                 aeron_subscribable_list_entry_t *entry =
                     &link->subscribable_list.array[link->subscribable_list.length++];
 
-                aeron_counter_set_ordered(position_addr, joining_position);
+                aeron_counter_set_release(position_addr, joining_position);
 
                 entry->subscribable = subscribable;
                 entry->counter_id = counter_id;
@@ -4781,7 +4781,7 @@ int aeron_driver_conductor_on_client_keepalive(aeron_driver_conductor_t *conduct
     {
         aeron_client_t *client = &conductor->clients.array[index];
         int64_t now_ms = aeron_clock_cached_epoch_time(conductor->context->cached_clock);
-        aeron_counter_set_ordered(client->heartbeat_timestamp.value_addr, now_ms);
+        aeron_counter_set_release(client->heartbeat_timestamp.value_addr, now_ms);
     }
 
     return 0;
@@ -5801,7 +5801,7 @@ int aeron_driver_conductor_on_client_close(aeron_driver_conductor_t *conductor, 
         aeron_client_t *client = &conductor->clients.array[index];
 
         client->closed_by_command = true;
-        aeron_counter_set_ordered(client->heartbeat_timestamp.value_addr, 0);
+        aeron_counter_set_release(client->heartbeat_timestamp.value_addr, 0);
     }
 
     return 0;

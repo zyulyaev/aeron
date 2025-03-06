@@ -239,7 +239,7 @@ inline bool aeron_publication_image_is_flow_control_under_run(aeron_publication_
 
     if (is_flow_control_under_run)
     {
-        aeron_counter_ordered_increment(image->flow_control_under_runs_counter, 1);
+        aeron_counter_increment_release(image->flow_control_under_runs_counter);
     }
 
     return is_flow_control_under_run;
@@ -252,7 +252,7 @@ inline bool aeron_publication_image_is_flow_control_over_run(
 
     if (is_flow_control_over_run)
     {
-        aeron_counter_ordered_increment(image->flow_control_over_runs_counter, 1);
+        aeron_counter_increment_release(image->flow_control_over_runs_counter);
     }
 
     return is_flow_control_over_run;
@@ -274,7 +274,7 @@ inline void aeron_publication_image_schedule_status_message(
 
 inline bool aeron_publication_image_is_drained(aeron_publication_image_t *image)
 {
-    int64_t rebuild_position = aeron_counter_get(image->rcv_pos_position.value_addr);
+    int64_t rebuild_position = aeron_counter_get_plain(image->rcv_pos_position.value_addr);
 
     for (size_t i = 0, length = image->conductor_fields.subscribable.length; i < length; i++)
     {
@@ -282,7 +282,7 @@ inline bool aeron_publication_image_is_drained(aeron_publication_image_t *image)
 
         if (AERON_SUBSCRIPTION_TETHER_RESTING != tetherable_position->state)
         {
-            const int64_t sub_pos = aeron_counter_get_volatile(tetherable_position->value_addr);
+            const int64_t sub_pos = aeron_counter_get_acquire(tetherable_position->value_addr);
 
             if (sub_pos < rebuild_position)
             {
@@ -351,7 +351,7 @@ inline int64_t aeron_publication_image_join_position(aeron_publication_image_t *
 
         if (AERON_SUBSCRIPTION_TETHER_RESTING != tetherable_position->state)
         {
-            const int64_t sub_pos = aeron_counter_get_volatile(tetherable_position->value_addr);
+            const int64_t sub_pos = aeron_counter_get_acquire(tetherable_position->value_addr);
 
             if (sub_pos < position)
             {

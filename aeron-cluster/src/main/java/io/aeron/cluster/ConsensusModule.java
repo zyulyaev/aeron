@@ -1994,7 +1994,7 @@ public final class ConsensusModule implements AutoCloseable
 
             if (null != consensusModuleExtension && 0 != serviceCount)
             {
-                throw new ClusterException("Service count must be zero when ConsensusModuleExtension installed");
+                throw new ClusterException("Service count must be zero when a ConsensusModuleExtension installed");
             }
 
             concludeMarkFile();

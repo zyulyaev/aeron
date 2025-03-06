@@ -395,14 +395,18 @@ static inline int32_t aeron_append_block(
     int32_t term_id)
 {
     int32_t resulting_offset = term_offset + (int32_t)length;
-    aeron_data_header_t *block_data_header = (aeron_data_header_t *)buffer;
-    aeron_data_header_t *data_header = (aeron_data_header_t *)(term_buffer->addr + term_offset);
-    int32_t length_of_first_frame = block_data_header->frame_header.frame_length;
-
-    block_data_header->frame_header.frame_length = 0;
-    memcpy(term_buffer->addr + term_offset, buffer, length);
-    AERON_SET_RELEASE(data_header->frame_header.frame_length, length_of_first_frame);
     aeron_put_raw_tail_ordered(term_tail_counter, term_id, resulting_offset);
+
+    aeron_data_header_as_longs_t *dest_hdr_as_longs = (aeron_data_header_as_longs_t *)term_buffer->addr;
+    aeron_data_header_as_longs_t *src_hdr_as_longs = (aeron_data_header_as_longs_t *)buffer;
+
+    memcpy(term_buffer->addr + AERON_DATA_HEADER_LENGTH, buffer + AERON_DATA_HEADER_LENGTH, length - AERON_DATA_HEADER_LENGTH);
+
+    dest_hdr_as_longs->hdr[3] = src_hdr_as_longs->hdr[3];
+    dest_hdr_as_longs->hdr[2] = src_hdr_as_longs->hdr[2];
+    dest_hdr_as_longs->hdr[1] = src_hdr_as_longs->hdr[1];
+
+    AERON_SET_RELEASE(dest_hdr_as_longs->hdr[0], src_hdr_as_longs->hdr[0]);
 
     return resulting_offset;
 }

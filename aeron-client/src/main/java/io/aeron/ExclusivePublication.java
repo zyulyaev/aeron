@@ -1001,12 +1001,14 @@ public final class ExclusivePublication extends ExclusivePublicationValues
         final int length)
     {
         final int resultingOffset = termOffset + length;
-        final int lengthOfFirstFrame = buffer.getInt(offset, LITTLE_ENDIAN);
 
         logMetaDataBuffer.putLongRelease(tailCounterOffset, packTail(termId, resultingOffset));
-        buffer.putInt(offset, 0, LITTLE_ENDIAN);
-        termBuffer.putBytes(termOffset, buffer, offset, length);
-        frameLengthOrdered(termBuffer, termOffset, lengthOfFirstFrame);
+
+        termBuffer.putBytes(termOffset + HEADER_LENGTH, buffer, offset + HEADER_LENGTH, length - HEADER_LENGTH);
+        termBuffer.putLong(termOffset + 24, buffer.getLong(offset + 24));
+        termBuffer.putLong(termOffset + 16, buffer.getLong(offset + 16));
+        termBuffer.putLong(termOffset + 8, buffer.getLong(offset + 8));
+        termBuffer.putLongRelease(termOffset, buffer.getLong(offset));
 
         return resultingOffset;
     }

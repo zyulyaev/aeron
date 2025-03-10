@@ -218,7 +218,7 @@ public:
     {
     }
 
-    Context(Context &other) noexcept = default;
+    Context(Context &other) = default;
 
     /// @cond HIDDEN_SYMBOLS
     this_t &conclude()

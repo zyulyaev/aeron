@@ -250,7 +250,7 @@ public:
      */
     inline std::string aeronDir()
     {
-        return std::string(aeron_context_get_dir(m_context));
+        return m_dirName;
     }
 
     /**

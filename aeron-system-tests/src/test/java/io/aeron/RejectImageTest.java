@@ -45,7 +45,6 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -56,10 +55,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.lessThan;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @ExtendWith({ EventLogExtension.class, InterruptingTestCallback.class })
@@ -119,9 +115,10 @@ public class RejectImageTest
     @Test
     @InterruptAfter(10)
     @SlowTest
+    @SuppressWarnings("MethodLength")
     void shouldRejectSubscriptionsImage() throws IOException
     {
-        context.imageLivenessTimeoutNs(TimeUnit.SECONDS.toNanos(3));
+        context.imageLivenessTimeoutNs(TimeUnit.MILLISECONDS.toNanos(1234));
 
         final TestMediaDriver driver = launch();
         final QueuedErrorFrameHandler errorFrameHandler = new QueuedErrorFrameHandler();
@@ -130,11 +127,16 @@ public class RejectImageTest
             .aeronDirectoryName(driver.aeronDirectoryName())
             .publicationErrorFrameHandler(errorFrameHandler);
 
-        final AtomicBoolean imageUnavailable = new AtomicBoolean(false);
+        final AtomicInteger imageAvailable = new AtomicInteger();
+        final AtomicInteger imageUnavailable = new AtomicInteger();
 
         try (Aeron aeron = Aeron.connect(ctx);
             Publication pub = aeron.addPublication(channel, streamId);
-            Subscription sub = aeron.addSubscription(channel, streamId, null, image -> imageUnavailable.set(true)))
+            Subscription sub = aeron.addSubscription(
+                channel,
+                streamId,
+                image -> imageAvailable.getAndIncrement(),
+                image -> imageUnavailable.getAndIncrement()))
         {
             Tests.awaitConnected(pub);
             Tests.awaitConnected(sub);
@@ -193,7 +195,7 @@ public class RejectImageTest
             assertEquals(reason, errorFrame.errorMessage());
             assertEquals(pub.registrationId(), errorFrame.registrationId());
 
-            while (!imageUnavailable.get())
+            while (0 == imageUnavailable.get())
             {
                 Tests.yield();
             }
@@ -205,6 +207,17 @@ public class RejectImageTest
             assertEquals(1, countersReader.getCounterValue(ERRORS.id()) - initialErrors);
 
             SystemTests.waitForErrorToOccur(driver.aeronDirectoryName(), containsString(reason), Tests.SLEEP_1_MS);
+
+            // Should reconnect after an image liveness timeout
+            while (1 == imageAvailable.get())
+            {
+                Tests.yield();
+            }
+            assertTrue(pub.isConnected());
+            assertTrue(sub.isConnected());
+            assertEquals(1, sub.imageCount());
+            assertNotSame(image, sub.imageAtIndex(0));
+            assertNotEquals(image.correlationId(), sub.imageAtIndex(0).correlationId());
         }
     }
 

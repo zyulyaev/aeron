@@ -2492,7 +2492,10 @@ final class ConsensusModuleAgent
                     clusterTermination.terminationPosition(
                         errorHandler, consensusPublisher, activeMembers, thisMember, leadershipTermId, position);
                     terminationPosition = position;
-                    serviceProxy.terminationPosition(terminationPosition, errorHandler);
+                    if (serviceCount > 0)
+                    {
+                        serviceProxy.terminationPosition(terminationPosition, errorHandler);
+                    }
                     state(ConsensusModule.State.TERMINATING);
                     break;
                 }
@@ -3277,7 +3280,10 @@ final class ConsensusModuleAgent
 
         if (null != clusterTermination)
         {
-            serviceProxy.terminationPosition(terminationPosition, ctx.countedErrorHandler());
+            if (serviceCount > 0)
+            {
+                serviceProxy.terminationPosition(terminationPosition, ctx.countedErrorHandler());
+            }
             clusterTermination.deadlineNs(clusterClock.timeNanos() + ctx.terminationTimeoutNs());
             state(ConsensusModule.State.TERMINATING);
         }

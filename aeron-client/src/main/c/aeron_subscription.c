@@ -286,8 +286,6 @@ int aeron_subscription_image_count(aeron_subscription_t *subscription)
 
     AERON_GET_ACQUIRE(image_list, subscription->conductor_fields.image_lists_head.next_list);
 
-    aeron_subscription_propose_last_image_change_number(subscription, image_list->change_number);
-
     return (int)image_list->length;
 }
 

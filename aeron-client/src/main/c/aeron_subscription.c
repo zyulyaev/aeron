@@ -376,7 +376,6 @@ int aeron_subscription_image_retain(aeron_subscription_t *subscription, aeron_im
     }
 
     aeron_image_incr_refcnt(image);
-    aeron_subscription_propose_last_image_change_number(subscription, image_list->change_number);
 
     return 0;
 }
@@ -403,7 +402,6 @@ int aeron_subscription_image_release(aeron_subscription_t *subscription, aeron_i
     }
 
     aeron_image_decr_refcnt(image);
-    aeron_subscription_propose_last_image_change_number(subscription, image_list->change_number);
 
     return 0;
 }

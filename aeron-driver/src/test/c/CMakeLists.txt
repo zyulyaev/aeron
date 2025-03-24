@@ -115,7 +115,7 @@ if (AERON_UNIT_TESTS)
         add_executable(aeronmd_signal_test aeronmd_signal_test.cpp)
         add_dependencies(aeronmd_signal_test gmock aeronmd)
         target_compile_definitions(aeronmd_signal_test PUBLIC "_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING")
-        target_link_libraries(aeronmd_signal_test aeron_driver gmock_main ${CMAKE_THREAD_LIBS_INIT} ${AERON_LIB_WINSOCK_LIBS})
+        target_link_libraries(aeronmd_signal_test aeron gmock_main ${CMAKE_THREAD_LIBS_INIT} ${AERON_LIB_WINSOCK_LIBS})
         add_test(NAME aeronmd_signal_test COMMAND aeronmd_signal_test $<TARGET_FILE:aeronmd>)
     endif ()
 

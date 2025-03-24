@@ -40,12 +40,10 @@ TEST_F(AeronmdSignalTest, shouldSupportSigTerm)
 
     if (argc < 2)
     {
-        std::cout << "aeronmd path is not set" << std::endl;
-        GTEST_SKIP();
+        FAIL() << "aeronmd path is not set";
     }
 
-    std::string launch = std::string(argv[1]) + " -Downer=AeronmdSignalTest";
-    FILE *aeronmdOutput = popen(launch.c_str(), "r");
+    FILE *aeronmdOutput = popen(argv[1], "r");
     ASSERT_NE(nullptr, aeronmdOutput);
 
     aeron_context_t *context;
@@ -67,8 +65,7 @@ TEST_F(AeronmdSignalTest, shouldSupportSigTerm)
 
     kill(pid, SIGTERM);
 
-    int status = 0;
-    waitpid(pid, &status, WSTOPPED);
+    waitpid(pid, nullptr, WSTOPPED);
 
     std::stringstream ss;
     while (nullptr != fgets(buf, sizeof(buf) - 1, aeronmdOutput))

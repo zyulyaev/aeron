@@ -55,6 +55,7 @@ TEST_F(AeronmdSignalTest, shouldSupportSigTerm)
     ASSERT_EQ(0, aeron_init(&aeron, context));
 
     aeron_close(aeron);
+    aeron_context_close(context);
 
     FILE *psgrepOutput = popen("/usr/bin/pgrep -xn aeronmd", "r");
 

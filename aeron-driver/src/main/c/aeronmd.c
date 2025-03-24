@@ -110,6 +110,7 @@ int main(int argc, char **argv)
     }
 
     signal(SIGINT, sigint_handler);
+    signal(SIGTERM, sigint_handler);
 
     if (aeron_driver_context_init(&context) < 0)
     {

@@ -647,8 +647,9 @@ class ImageTest
         assertThat(image.isClosed(), is(true));
 
         final InOrder inOrder = Mockito.inOrder(position);
-        inOrder.verify(position).setRelease(initialPosition);
-        inOrder.verify(position).setRelease(initialPosition + ALIGNED_FRAME_LENGTH);
+        inOrder.verify(position, times(2)).get();
+        inOrder.verify(position).getVolatile();
+        inOrder.verifyNoMoreInteractions();
     }
 
     @Test
@@ -668,8 +669,9 @@ class ImageTest
         assertThat(image.isClosed(), is(true));
 
         final InOrder inOrder = Mockito.inOrder(position);
-        inOrder.verify(position).setRelease(initialPosition);
-        inOrder.verify(position).setRelease(initialPosition + ALIGNED_FRAME_LENGTH);
+        inOrder.verify(position, times(2)).get();
+        inOrder.verify(position).getVolatile();
+        inOrder.verifyNoMoreInteractions();
     }
 
     @Test
@@ -692,8 +694,9 @@ class ImageTest
         assertThat(image.isClosed(), is(true));
 
         final InOrder inOrder = Mockito.inOrder(position);
-        inOrder.verify(position).setRelease(initialPosition);
-        inOrder.verify(position).setRelease(initialPosition + ALIGNED_FRAME_LENGTH);
+        inOrder.verify(position, times(2)).get();
+        inOrder.verify(position).getVolatile();
+        inOrder.verifyNoMoreInteractions();
     }
 
     @Test
@@ -719,8 +722,9 @@ class ImageTest
         assertThat(image.isClosed(), is(true));
 
         final InOrder inOrder = Mockito.inOrder(position);
-        inOrder.verify(position).setRelease(initialPosition);
-        inOrder.verify(position).setRelease(initialPosition + ALIGNED_FRAME_LENGTH);
+        inOrder.verify(position, times(2)).get();
+        inOrder.verify(position).getVolatile();
+        inOrder.verifyNoMoreInteractions();
     }
 
     @Test

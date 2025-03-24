@@ -364,7 +364,7 @@ public final class Image
         finally
         {
             final long newPosition = initialPosition + (offset - initialOffset);
-            if (newPosition > initialPosition)
+            if (newPosition > initialPosition && !isClosed)
             {
                 subscriberPosition.setRelease(newPosition);
             }
@@ -442,7 +442,10 @@ public final class Image
                 {
                     initialPosition += (offset - initialOffset);
                     initialOffset = offset;
-                    subscriberPosition.setRelease(initialPosition);
+                    if (!isClosed)
+                    {
+                        subscriberPosition.setRelease(initialPosition);
+                    }
                 }
             }
         }
@@ -453,7 +456,7 @@ public final class Image
         finally
         {
             final long resultingPosition = initialPosition + (offset - initialOffset);
-            if (resultingPosition > initialPosition)
+            if (resultingPosition > initialPosition && !isClosed)
             {
                 subscriberPosition.setRelease(resultingPosition);
             }
@@ -528,7 +531,7 @@ public final class Image
         finally
         {
             final long resultingPosition = initialPosition + (offset - initialOffset);
-            if (resultingPosition > initialPosition)
+            if (resultingPosition > initialPosition && !isClosed)
             {
                 subscriberPosition.setRelease(resultingPosition);
             }
@@ -615,7 +618,10 @@ public final class Image
                 {
                     initialPosition += (offset - initialOffset);
                     initialOffset = offset;
-                    subscriberPosition.setRelease(initialPosition);
+                    if (!isClosed)
+                    {
+                        subscriberPosition.setRelease(initialPosition);
+                    }
                 }
             }
         }
@@ -626,7 +632,7 @@ public final class Image
         finally
         {
             final long resultingPosition = initialPosition + (offset - initialOffset);
-            if (resultingPosition > initialPosition)
+            if (resultingPosition > initialPosition && !isClosed)
             {
                 subscriberPosition.setRelease(resultingPosition);
             }
@@ -768,7 +774,10 @@ public final class Image
             }
             finally
             {
-                subscriberPosition.setRelease(position + length);
+                if (!isClosed)
+                {
+                    subscriberPosition.setRelease(position + length);
+                }
             }
         }
 
@@ -823,7 +832,10 @@ public final class Image
             }
             finally
             {
-                subscriberPosition.setRelease(position + length);
+                if (!isClosed)
+                {
+                    subscriberPosition.setRelease(position + length);
+                }
             }
         }
 

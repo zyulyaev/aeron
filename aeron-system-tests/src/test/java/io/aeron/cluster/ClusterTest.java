@@ -17,7 +17,9 @@ package io.aeron.cluster;
 
 import io.aeron.Aeron;
 import io.aeron.Counter;
+import io.aeron.Image;
 import io.aeron.Publication;
+import io.aeron.Subscription;
 import io.aeron.archive.Archive;
 import io.aeron.archive.ArchiveThreadingMode;
 import io.aeron.archive.client.AeronArchive;
@@ -35,7 +37,10 @@ import io.aeron.logbuffer.BufferClaim;
 import io.aeron.logbuffer.ControlledFragmentHandler;
 import io.aeron.logbuffer.Header;
 import io.aeron.protocol.DataHeaderFlyweight;
+import io.aeron.security.AuthenticationException;
+import io.aeron.security.Authenticator;
 import io.aeron.security.AuthorisationService;
+import io.aeron.security.SessionProxy;
 import io.aeron.status.HeartbeatTimestamp;
 import io.aeron.test.*;
 import io.aeron.test.cluster.ClusterTests;
@@ -51,6 +56,8 @@ import org.agrona.collections.IntHashSet;
 import org.agrona.collections.MutableBoolean;
 import org.agrona.collections.MutableInteger;
 import org.agrona.collections.MutableLong;
+import org.agrona.concurrent.BackoffIdleStrategy;
+import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.status.CountersReader;
 import org.hamcrest.CoreMatchers;
@@ -65,14 +72,17 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import java.util.zip.CRC32;
 
+import static io.aeron.archive.client.AeronArchive.NULL_POSITION;
 import static io.aeron.cluster.client.AeronCluster.SESSION_HEADER_LENGTH;
 import static io.aeron.cluster.service.Cluster.Role.FOLLOWER;
 import static io.aeron.cluster.service.Cluster.Role.LEADER;
@@ -2672,6 +2682,111 @@ class ClusterTest
                 assertEquals(5,
                     ((TestNode.TestService)clusteredServiceContainer2.context().clusteredService()).messageCount());
             }
+        }
+    }
+
+    @Test
+    void allNodesShouldHaveIdenticalSnapshots()
+    {
+        cluster = aCluster()
+                .withStaticNodes(3)
+                .withAuthenticationSupplier(() -> new Authenticator()
+                {
+                    @Override
+                    public void onConnectRequest(
+                        final long sessionId, final byte[] encodedCredentials, final long nowMs)
+                    {
+                    }
+
+                    @Override
+                    public void onChallengeResponse(
+                        final long sessionId, final byte[] encodedCredentials, final long nowMs)
+                    {
+                    }
+
+                    @Override
+                    public void onConnectedSession(final SessionProxy sessionProxy, final long nowMs)
+                    {
+                        sessionProxy.reject();
+                    }
+
+                    @Override
+                    public void onChallengedSession(final SessionProxy sessionProxy, final long nowMs)
+                    {
+                    }
+                })
+                .start();
+        systemTestWatcher.cluster(cluster);
+
+        final TestNode leader = cluster.awaitLeader();
+        assertThrowsExactly(AuthenticationException.class, () -> cluster.connectClient());
+
+        cluster.takeSnapshot(leader);
+        cluster.awaitSnapshotCount(1);
+
+        final List<byte[]> snapshots = IntStream.range(0, 3)
+            .mapToObj(nodeIdx -> readLatestSnapshot(cluster.node(nodeIdx)))
+            .toList();
+
+        for (int nodeIdx = 1; nodeIdx < 3; nodeIdx++)
+        {
+            assertArrayEquals(snapshots.get(nodeIdx), snapshots.get(0));
+        }
+    }
+
+    private byte[] readLatestSnapshot(final TestNode node)
+    {
+        final long recordingId;
+        try (RecordingLog recordingLog = new RecordingLog(node.consensusModule().context().clusterDir(), false))
+        {
+            final RecordingLog.Entry snapshot = recordingLog.getLatestSnapshot(-1);
+            assertNotNull(snapshot);
+
+            recordingId = snapshot.recordingId;
+        }
+
+        final AeronArchive.Context archiveCtx = new AeronArchive.Context()
+            .controlRequestChannel(node.archive().context().localControlChannel())
+            .controlResponseChannel(node.archive().context().localControlChannel())
+            .controlRequestStreamId(node.archive().context().localControlStreamId())
+            .aeronDirectoryName(node.mediaDriver().aeronDirectoryName());
+
+        try (
+            AeronArchive archive = AeronArchive.connect(archiveCtx);
+            Subscription subscription = archive.replay(recordingId, NULL_POSITION, Long.MAX_VALUE, "aeron:ipc", 12345)
+        )
+        {
+            final ExpandableArrayBuffer destBuffer = new ExpandableArrayBuffer();
+            final MutableInteger destOffset = new MutableInteger();
+            final IdleStrategy idleStrategy = new BackoffIdleStrategy();
+
+            while (subscription.imageCount() == 0)
+            {
+                if (Thread.interrupted())
+                {
+                    fail("interrupted");
+                }
+
+                idleStrategy.idle();
+            }
+            idleStrategy.reset();
+
+            final Image image = subscription.imageAtIndex(0);
+            while (!image.isClosed())
+            {
+                if (Thread.interrupted())
+                {
+                    fail("interrupted");
+                }
+
+                final long work = image.poll((srcBuffer, offset, length, header) ->
+                {
+                    destBuffer.putBytes(destOffset.getAndAdd(length), srcBuffer, offset, length);
+                }, Integer.MAX_VALUE);
+                idleStrategy.idle((int)work);
+            }
+
+            return Arrays.copyOf(destBuffer.byteArray(), destOffset.get());
         }
     }
 

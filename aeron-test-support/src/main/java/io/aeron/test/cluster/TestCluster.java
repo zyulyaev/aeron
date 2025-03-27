@@ -2327,19 +2327,28 @@ public final class TestCluster implements AutoCloseable
     private final class KeepAlive implements Runnable
     {
         private long keepAliveDeadlineMs;
-        private EpochClock epochClock;
 
         private void init()
         {
-            this.epochClock = requireNonNull(client, "client is not connected")
-                .context().aeron().context().epochClock();
+            if (client == null)
+            {
+                return;
+            }
+
+            final EpochClock epochClock = client.context().aeron().context().epochClock();
             final long nowMs = epochClock.time();
             keepAliveDeadlineMs = nowMs + TimeUnit.SECONDS.toMillis(1);
         }
 
         public void run()
         {
-            final long nowMs = requireNonNull(epochClock, "did you call init() first?").time();
+            if (client == null)
+            {
+                return;
+            }
+
+            final EpochClock epochClock = client.context().aeron().context().epochClock();
+            final long nowMs = epochClock.time();
             if (nowMs > keepAliveDeadlineMs)
             {
                 client.sendKeepAlive();
